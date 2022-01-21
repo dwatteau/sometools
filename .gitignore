@@ -1,0 +1,32 @@
+# Backup files
+*~
+.\#*
+\#*\#
+*.bak
+*.orig
+*.*.swp
+# OS cruft
+._*
+desktop.ini
+.DS_Store
+.fseventsd
+.Spotlight-V100
+Thumbs.db
+.Trashes
+# Binaries or build/debug artefacts
+*.a
+*.core
+.deps
+_deps
+*.dSYM
+*.exe
+.gdb_history
+gdb.txt
+*.lib
+*.ncb
+*.o
+*.obj
+*.pdb
+*.pch
+*.suo
+tags
