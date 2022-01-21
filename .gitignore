@@ -30,3 +30,4 @@ gdb.txt
 *.pch
 *.suo
 tags
+xorfile
