@@ -45,11 +45,6 @@ main(int argc, char *argv[])
 		perror("_setmode()");
 		exit(EXIT_FAILURE);
 	}
-#else
-	if (freopen(NULL, "rb", stdin) == NULL || freopen(NULL, "wb", stdout) == NULL) {
-		perror("freopen()");
-		exit(EXIT_FAILURE);
-	}
 #endif
 
 	if (argc != 2) {
