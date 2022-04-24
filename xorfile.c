@@ -38,7 +38,7 @@ main(int argc, char *argv[])
 	unsigned char buf[BUFSIZ];
 	size_t n, i;
 	char *endconvptr;
-	long xorkey;
+	long key;
 
 #ifdef _WIN32
 	if (_setmode(_fileno(stdin), _O_BINARY) == -1 || _setmode(_fileno(stdout), _O_BINARY) == -1) {
@@ -48,21 +48,21 @@ main(int argc, char *argv[])
 #endif
 
 	if (argc != 2) {
-		fprintf(stderr, "USAGE: %s keyvalue < input > output\n", argv[0]);
+		fprintf(stderr, "USAGE: %s key < input > output\n", argv[0]);
 		exit(EXIT_FAILURE);
 	}
 
 	errno = 0;
-	xorkey = strtol(argv[1], &endconvptr, 0);
+	key = strtol(argv[1], &endconvptr, 0);
 	if (argv[1][0] == '\0' || *endconvptr != '\0' || errno == ERANGE || errno == EINVAL ||
-	    xorkey < 0 || xorkey > UCHAR_MAX) {
+	    key < 0 || key > 255) {
 		fprintf(stderr, "ERROR: Invalid key; 0-255 or 0x00-0xff value expected\n");
 		exit(EXIT_FAILURE);
 	}
 
 	while ((n = fread(buf, 1, BUFSIZ, stdin)) != 0) {
 		for (i = 0; i < n; i++)
-			buf[i] ^= (unsigned char)xorkey;
+			buf[i] ^= (unsigned char)key;
 
 		if (fwrite(buf, 1, n, stdout) != n) {
 			perror("fwrite()");
