@@ -20,6 +20,7 @@ Thumbs.db
 _deps
 *.dSYM
 *.exe
+*.EXE
 .gdb_history
 gdb.txt
 *.lib
@@ -30,4 +31,5 @@ gdb.txt
 *.pch
 *.suo
 tags
+mmx-check
 xorfile
