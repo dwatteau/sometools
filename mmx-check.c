@@ -43,13 +43,13 @@
 #	endif
 #elif defined(__GNUC__) && defined(__i386__)
 #	if defined(__clang__) || (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 3))
-#		define HAVE_GET_CPUID
+#		define HAVE_GCC_MODERN_CPUID
 #	elif __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ >= 95)
 #		define HAVE_GCC_INLINE_ASM
 #	endif
 #endif
 
-#ifdef HAVE_GET_CPUID
+#ifdef HAVE_GCC_MODERN_CPUID
 #include <cpuid.h>
 #endif
 
@@ -96,27 +96,54 @@ has_mmx_support(void)
 {
 #if defined(HAVE_MMX_ALWAYS)
 	return 1;
-#elif defined(HAVE_GET_CPUID)
+#elif defined(HAVE_GCC_MODERN_CPUID)
 	unsigned int eax, ebx, ecx, edx;
 
 	return !!(__get_cpuid(1, &eax, &ebx, &ecx, &edx) && (edx & bit_MMX));
 #elif defined(HAVE_INTRIN_CPUID)
 	int regs[4];
 
+	/* Check that CPUID level 1 is supported, first */
+	__cpuid(regs, 0);
+	if (regs[0] < 1)
+		return 0;
+
+	/* Do the MMX test */
 	__cpuid(regs, 1);
 	return !!(regs[3] & bit_MMX);
 #elif defined(HAVE_GCC_INLINE_ASM)
+	/* Note: everything here should be PIC compatible */
 	unsigned int eax, ebx, ecx, edx;
 
 	if (!has_cpuid_support())
 		return 0;
 
-	/* PIC compatible */
+	/*
+	 * Check that CPUID level 1 is supported, first.
+	 *
+	 * Also clear ECX to work around an old Cyrix bug, see:
+	 * <https://bugzilla.mozilla.org/show_bug.cgi?id=1096651#c9>
+	 */
 	__asm__ __volatile__(
-		"xchgl %%ebx, %1\n\t"
+		"xorl %%ecx, %%ecx\n\t"
+		"xorl %%eax, %%eax\n\t"
+		"pushl %%ebx\n\t"
 		"cpuid\n\t"
-		"xchgl %%ebx, %1\n\t"
-		: "=a"(eax), "=&r"(ebx), "=c"(ecx), "=d"(edx)
+		"movl %%ebx, %1\n\t"
+		"popl %%ebx\n\t"
+		: "=a"(eax), "=r"(ebx), "=c"(ecx), "=d"(edx)
+	);
+	if (eax < 1)
+		return 0;
+
+	/* Do the MMX test */
+	__asm__ __volatile__(
+		"xorl %%ecx, %%ecx\n\t"
+		"pushl %%ebx\n\t"
+		"cpuid\n\t"
+		"movl %%ebx, %1\n\t"
+		"popl %%ebx\n\t"
+		: "=a"(eax), "=r"(ebx), "=c"(ecx), "=d"(edx)
 		: "0"(1)
 	);
 
