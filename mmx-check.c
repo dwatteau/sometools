@@ -24,20 +24,75 @@
 
 #include <stdio.h>
 
-#if defined(__x86_64__) || defined(__amd64__) || defined(_M_AMD64)
-#  define HAVE_MMX_ALWAYS
-#elif defined(__i386__) && (defined(__clang__) || (defined(__GNUC__) && (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 3))))
-#  define HAVE_GET_CPUID
+/* TODO: confirm ICC test on Windows and non-Windows */
+
+#if defined(__x86_64__) || defined(__amd64__) || defined(_M_AMD64) || defined(__amd64) || \
+    defined(__SSE__) || defined(__SSE2__) || (defined(_M_IX86_FP) && _M_IX86_FP >= 1)
+#	define HAVE_MMX_ALWAYS
+#elif defined(__INTEL_COMPILER) && !defined(__GNUC__) && (defined(__i386__) || defined(_M_IX86))
+#	define HAVE_INTRIN_CPUID
 #elif defined(_WIN32) && (defined(_M_IX86) || defined(_M_AMD64))
-#  define HAVE_MS_CPUID
+#	define HAVE_INTRIN_CPUID
+#elif ((defined(__SUNPRO_C) && __SUNPRO_C >= 0x5100) || (defined(__SUNPRO_CC) && __SUNPRO_CC >= 0x5100)) && defined(__i386)
+#	define HAVE_GCC_INLINE_ASM
+#	ifndef __asm__
+#		define __asm__ asm
+#	endif
+#	ifndef __volatile__
+#		define __volatile__ volatile
+#	endif
+#elif defined(__GNUC__) && defined(__i386__)
+#	if defined(__clang__) || (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 3))
+#		define HAVE_GET_CPUID
+#	elif __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ >= 95)
+#		define HAVE_GCC_INLINE_ASM
+#	endif
 #endif
 
 #ifdef HAVE_GET_CPUID
 #include <cpuid.h>
 #endif
 
+#ifdef HAVE_INTRIN_CPUID
+#include <intrin.h>
+#endif
+
+#ifndef bit_CPUID
+#define bit_CPUID	(1 << 21)
+#endif
+
 #ifndef bit_MMX
 #define bit_MMX		(1 << 23)
+#endif
+
+#ifdef HAVE_GCC_INLINE_ASM
+/*
+ * When calling `cpuid` through inline ASM, check that the CPUID feature
+ * itself is available first, as this was introduced with i586.
+ */
+static int
+has_cpuid_support(void)
+{
+	unsigned int eax, edx;
+
+	__asm__ __volatile__(
+		"pushfl\n\t"
+		"pushfl\n\t"
+		"popl %0\n\t"
+		"movl %0, %1\n\t"
+		"xorl %2, %0\n\t"
+		"pushl %0\n\t"
+		"popfl\n\t"
+		"pushfl\n\t"
+		"popl %0\n\t"
+		"popfl\n\t"
+		: "=&r"(eax), "=&r"(edx)
+		: "i"(bit_CPUID)
+		: "cc"
+	);
+
+	return ((eax ^ edx) & bit_CPUID) != 0;
+}
 #endif
 
 static int
@@ -49,11 +104,27 @@ has_mmx_support(void)
 	unsigned int eax, ebx, ecx, edx;
 
 	return !!(__get_cpuid(1, &eax, &ebx, &ecx, &edx) && (edx & bit_MMX));
-#elif defined(HAVE_MS_CPUID)
-	int regs[4] = { -1 };
+#elif defined(HAVE_INTRIN_CPUID)
+	int regs[4];
 
 	__cpuid(regs, 1);
 	return !!(regs[3] & bit_MMX);
+#elif defined(HAVE_GCC_INLINE_ASM)
+	unsigned int eax, ebx, ecx, edx;
+
+	if (!has_cpuid_support())
+		return 0;
+
+	/* PIC compatible */
+	__asm__ __volatile__(
+		"xchgl %%ebx, %1\n\t"
+		"cpuid\n\t"
+		"xchgl %%ebx, %1\n\t"
+		: "=a"(eax), "=&r"(ebx), "=c"(ecx), "=d"(edx)
+		: "0"(1)
+	);
+
+	return !!(edx & bit_MMX);
 #else
 	return -1;
 #endif
