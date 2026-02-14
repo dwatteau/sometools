@@ -57,10 +57,6 @@
 #include <intrin.h>
 #endif
 
-#ifndef bit_CPUID
-#define bit_CPUID	(1 << 21)
-#endif
-
 #ifndef bit_MMX
 #define bit_MMX		(1 << 23)
 #endif
@@ -80,18 +76,18 @@ has_cpuid_support(void)
 		"pushfl\n\t"
 		"popl %0\n\t"
 		"movl %0, %1\n\t"
-		"xorl %2, %0\n\t"
+		"xorl $0x200000, %0\n\t"
 		"pushl %0\n\t"
 		"popfl\n\t"
 		"pushfl\n\t"
 		"popl %0\n\t"
 		"popfl\n\t"
 		: "=&r"(eax), "=&r"(edx)
-		: "i"(bit_CPUID)
+		:
 		: "cc"
 	);
 
-	return ((eax ^ edx) & bit_CPUID) != 0;
+	return ((eax ^ edx) & 0x200000) != 0;
 }
 #endif
 
